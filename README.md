@@ -103,3 +103,11 @@ Once your hub is running online, the main hub can relay the messages received to
 ### Load a space setting
 
 To load a space settings in the database you can go on this endpoint <http://localhost:3000/api/spaces/yam.eth/poke> (change yam.eth with the space you want to activate).
+
+
+## for devops
+1. login to docckerator machine
+2. cd snapshot-hub
+3. pm2 stop snapshothub 
+4. git pull
+5. pm2 start snapshothub
