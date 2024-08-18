@@ -17,9 +17,9 @@ export default async function ingestor(body) {
 
   if (!body || !body.address || !body.msg || !body.sig)
     return Promise.reject('wrong message body');
-
+console.log('>>> T2')
   const msg = jsonParse(body.msg);
-
+console.log('>>> T3')
   if (
     Object.keys(msg).length !== 5 ||
     !msg.space ||
@@ -28,8 +28,10 @@ export default async function ingestor(body) {
   )
     return Promise.reject('wrong signed message');
 
-  if (JSON.stringify(body).length > 1e5)
+  if (JSON.stringify(body).length > 1e5) {
+    console.log('>>> TOO LARGE', JSON.stringify(body).length)
     return Promise.reject('too large message');
+  }
 
   if (!spaces[msg.space] && msg.type !== 'settings')
     return Promise.reject('unknown space');

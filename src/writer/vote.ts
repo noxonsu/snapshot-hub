@@ -18,6 +18,19 @@ export async function verify(body): Promise<any> {
 
   const proposal = await getProposal(msg.space, msg.payload.proposal);
   if (!proposal) return Promise.reject('unknown proposal');
+  if (proposal?.whitelist) {
+    try {
+      const whitelisted = JSON.parse(proposal?.whitelist)
+      if (whitelisted && whitelisted.length) {
+        if (whitelisted.indexOf(body.address.toLowerCase()) == -1) {
+          return Promise.reject('not in whitelist')
+        }
+      }
+    } catch (e) {
+      console.log('>> CHECK VOTE WHITELIST ERROR', e)
+      return Promise.reject('check whitelist error')
+    }
+  }
 
   const tsInt = (Date.now() / 1e3).toFixed();
   const msgTs = parseInt(msg.timestamp);

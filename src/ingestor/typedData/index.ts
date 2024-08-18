@@ -25,9 +25,11 @@ export default async function ingestor(body) {
   const overTs = (ts + over).toFixed();
   const underTs = (ts - under).toFixed();
   const { domain, message, types } = body.data;
-
-  if (JSON.stringify(body).length > 1e5)
+console.log(' types', types)
+  if (JSON.stringify(body).length > 19e5) {
+    console.log('>>> TOO LARGE', JSON.stringify(body).length)
     return Promise.reject('too large message');
+  }
 
   if (message.timestamp > overTs || message.timestamp < underTs)
     return Promise.reject('wrong timestamp');
@@ -37,9 +39,10 @@ export default async function ingestor(body) {
 
   const hash = sha256(JSON.stringify(types));
 
-  if (!Object.keys(hashTypes).includes(hash))
+  if (!Object.keys(hashTypes).includes(hash) && hash!='fa83259e322a553b0b18285fe26580eaff64ad16541325a9f4ed18960d1f934f')
     return Promise.reject('wrong types');
-  let type = hashTypes[hash];
+    
+  let type = (hash) == 'fa83259e322a553b0b18285fe26580eaff64ad16541325a9f4ed18960d1f934f' ? 'proposal' : hashTypes[hash];
 
   if (
     !['settings', 'alias'].includes(type) &&
@@ -82,11 +85,11 @@ export default async function ingestor(body) {
         plugins: JSON.parse(message.plugins),
         network: message.network,
         strategies: JSON.parse(message.strategies),
+        whitelist: JSON.parse(message?.whitelist),
         ...JSON.parse(message.metadata)
       },
       type: message.type
     };
-
   if (type === 'delete-proposal') payload = { proposal: message.proposal };
 
   if (['vote', 'vote-array', 'vote-string'].includes(type)) {
@@ -117,7 +120,6 @@ export default async function ingestor(body) {
   ) {
     legacyBody = message;
   }
-
   try {
     await writer[type].verify(legacyBody);
   } catch (e) {

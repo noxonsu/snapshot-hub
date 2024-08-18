@@ -35,7 +35,7 @@ export async function getScores(
 export async function getProposalScores(proposalId) {
   try {
     // Get proposal
-    const proposal = await getProposal({}, { id: proposalId });
+    const proposal = await getProposal({}, { id: proposalId, userWallet: ''});
 
     if (proposal.scores_state === 'final') {
       return {
