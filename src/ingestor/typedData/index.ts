@@ -8,6 +8,8 @@ import writer from '../../writer';
 import { pinJson } from '../../helpers/ipfs';
 import { sha256 } from '../../helpers/utils';
 import { isValidAlias } from '../../helpers/alias';
+import { _TypedDataEncoder } from "@ethersproject/hash";
+import { recoverPublicKey2 } from '../personalSign/utils'
 
 const NAME = 'snapshot';
 const VERSION = '0.1.4';
@@ -25,7 +27,7 @@ export default async function ingestor(body) {
   const overTs = (ts + over).toFixed();
   const underTs = (ts - under).toFixed();
   const { domain, message, types } = body.data;
-console.log(' types', types)
+
   if (JSON.stringify(body).length > 19e5) {
     console.log('>>> TOO LARGE', JSON.stringify(body).length)
     return Promise.reject('too large message');
@@ -66,7 +68,25 @@ console.log(' types', types)
     body.data
   );
   const id = snapshot.utils.getHash(body.data);
-  if (!isValid) return Promise.reject('wrong signature');
+  if (!isValid) {
+    // try WalletConnect - by signMessage check
+    const sourceData = {
+      domain: body.data.domain,
+      types: body.data.types,
+      value: body.data.message,
+    }
+    
+    const jsonMsg = JSON.stringify(sourceData)
+    
+    try {
+      const signer = recoverPublicKey2(body.sig, jsonMsg);
+      if (body.address.toLowerCase() !== signer.toLowerCase()) {
+        return Promise.reject('wrong signature');
+      }
+    } catch (err) {
+      return Promise.reject('wrong signature');
+    }
+  }
   console.log('[ingestor] Signature is valid');
 
   let payload = {};

@@ -17,9 +17,9 @@ export default async function ingestor(body) {
 
   if (!body || !body.address || !body.msg || !body.sig)
     return Promise.reject('wrong message body');
-console.log('>>> T2')
+
   const msg = jsonParse(body.msg);
-console.log('>>> T3')
+
   if (
     Object.keys(msg).length !== 5 ||
     !msg.space ||

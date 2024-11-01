@@ -158,7 +158,6 @@ router.get('/spaces/:key', (req, res) => {
 router.get('/spaces/:key/poke', async (req, res) => {
   const { key } = req.params;
   const space = await loadSpace(key);
-  console.log('>>> space', space)
   if (space) {
     await addOrUpdateSpace(key, space);
     spaces[key] = space;
@@ -177,11 +176,9 @@ router.post('/message', async (req, res) => {
 
 router.post('/msg', async (req, res) => {
   try {
-  console.log('>>> T1 OK')
     const result = await ingestor(req.body, 'typed-data');
     return res.json(result);
   } catch (e) {
-  console.log('>> err', e)
     return sendError(res, e);
   }
 });
