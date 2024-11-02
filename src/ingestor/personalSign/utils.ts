@@ -1,6 +1,13 @@
 import snapshot from '@snapshot-labs/snapshot.js';
 import * as ethUtil from 'ethereumjs-util';
 import { isValidSignature } from '../../helpers/eip1271';
+import Web3 from 'web3'
+
+export function recoverPublicKey2(sig: string, message: string): string {
+  const web3 = new Web3(Web3.givenProvider)
+  const signer = web3.eth.accounts.recover(message, sig)
+  return signer
+}
 
 export function recoverPublicKey(sig: string, hash: string): string {
   const params = ethUtil.fromRpcSig(sig);

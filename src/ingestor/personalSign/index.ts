@@ -28,8 +28,10 @@ export default async function ingestor(body) {
   )
     return Promise.reject('wrong signed message');
 
-  if (JSON.stringify(body).length > 1e5)
+  if (JSON.stringify(body).length > 1e5) {
+    console.log('>>> TOO LARGE', JSON.stringify(body).length)
     return Promise.reject('too large message');
+  }
 
   if (!spaces[msg.space] && msg.type !== 'settings')
     return Promise.reject('unknown space');

@@ -134,7 +134,8 @@ export async function action(body, ipfs, receipt, id): Promise<void> {
     scores_state: '',
     scores_total: 0,
     scores_updated: 0,
-    votes: 0
+    votes: 0,
+    whitelist: JSON.stringify(msg.payload.metadata.whitelist),
   };
   let query = 'INSERT IGNORE INTO proposals SET ?; ';
   const params: any[] = [proposal];

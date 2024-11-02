@@ -13,7 +13,7 @@ type Query {
     orderDirection: OrderDirection
   ): [Space]
 
-  proposal(id: String): Proposal
+  proposal(id: String, userWallet: String): Proposal
 
   proposals(
     first: Int
@@ -260,6 +260,8 @@ type Proposal {
   scores_total: Float
   scores_updated: Int
   votes: Int
+  whitelisted: Boolean
+  whitelist_allowed: Boolean
 }
 
 type Strategy {

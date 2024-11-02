@@ -1,13 +1,16 @@
 import snapshot from '@snapshot-labs/snapshot.js';
 import { spaces } from './spaces';
+import strategiesJson from '../strategies.json'
 
+//console.log('>>> strategiesJson', strategiesJson)
 export let strategies: any[] = [];
 
 const uri = 'https://score.snapshot.org/api/strategies';
 
 async function loadStrategies() {
   console.log('[strategies] Load strategies');
-  const res = await snapshot.utils.getJSON(uri);
+  //const res = await snapshot.utils.getJSON(uri);
+  const res = strategiesJson;
 
   Object.values(spaces).forEach((space: any) => {
     const ids = new Set<string>(

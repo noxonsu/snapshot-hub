@@ -9,6 +9,7 @@ console.log('Connection limit', connectionLimit);
 
 // @ts-ignore
 const config = parse(process.env.DATABASE_URL);
+
 config.connectionLimit = connectionLimit;
 config.multipleStatements = true;
 config.database = config.path[0];
