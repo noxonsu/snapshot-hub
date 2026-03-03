@@ -7,7 +7,7 @@ on:
     branches: ["**"]
 
 jobs:
-  test:
+  unit:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,14 +24,73 @@ jobs:
 
       - name: Run unit tests
         run: npm run test:unit
-        # Integration tests require running server + PostgreSQL — run locally:
-        # INTEGRATION=1 npm run test:integration
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: jest-results
-          path: |
-            coverage/
+          name: jest-unit-results
+          path: coverage/
+          retention-days: 7
+
+  integration:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: snaphub
+          POSTGRES_PASSWORD: snaphub_ci
+          POSTGRES_DB: snapshotdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js 18
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Apply database schema
+        run: psql postgresql://snaphub:snaphub_ci@localhost:5432/snapshotdb -f src/helpers/database/schema_pg.sql
+
+      - name: Start snapshot-hub server
+        run: npm start &
+        env:
+          DATABASE_URL: postgresql://snaphub:snaphub_ci@localhost:5432/snapshotdb
+          PORT: 3700
+
+      - name: Wait for server to be ready
+        run: |
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:3700/api && break
+            echo "Waiting for server... attempt $i"
+            sleep 3
+          done
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          INTEGRATION: "1"
+          SNAPSHOT_HUB_URL: http://localhost:3700
+          DATABASE_URL: postgresql://snaphub:snaphub_ci@localhost:5432/snapshotdb
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: jest-integration-results
+          path: coverage/
           retention-days: 7
