@@ -41,7 +41,7 @@ setTimeout(() => {
   const query = 'SELECT id, settings FROM spaces ORDER BY id ASC';
   db.queryAsync(query).then(result => {
     spaces = Object.fromEntries(
-      result.map(ensSpace => [ensSpace.id, JSON.parse(ensSpace.settings)])
+      result.map(ensSpace => [ensSpace.id, typeof ensSpace.settings === 'object' ? ensSpace.settings : JSON.parse(ensSpace.settings)])
     );
     const totalSpaces = Object.keys(spaces).length;
     const totalPublicSpaces = Object.values(spaces).filter(

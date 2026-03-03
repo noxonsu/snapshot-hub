@@ -97,19 +97,13 @@ export async function getProposalScores(proposalId) {
 
       let i = 0;
       for (const votesInPage of votesInPages) {
-        const params: any = [];
-        let query2 = '';
-        votesInPage.forEach((vote: any) => {
-          query2 += `UPDATE votes
-        SET vp = ?, vp_by_strategy = ?, vp_state = ?
-        WHERE id = ? AND proposal = ? LIMIT 1; `;
-          params.push(vote.balance);
-          params.push(JSON.stringify(vote.scores));
-          params.push(results.scores_state);
-          params.push(vote.id);
-          params.push(proposalId);
-        });
-        await db.queryAsync(query2, params);
+        for (const vote of votesInPage) {
+          await db.queryAsync(
+            `UPDATE votes SET vp = ?, vp_by_strategy = ?, vp_state = ?
+             WHERE ctid = (SELECT ctid FROM votes WHERE id = ? AND proposal = ? LIMIT 1)`,
+            [vote.balance, JSON.stringify(vote.scores), results.scores_state, vote.id, proposalId]
+          );
+        }
         if (i) await snapshot.utils.sleep(200);
         i++;
         console.log('[scores] Updated votes');
@@ -128,7 +122,7 @@ export async function getProposalScores(proposalId) {
       scores_total = ?,
       scores_updated = ?,
       votes = ?
-      WHERE id = ? LIMIT 1;
+      WHERE id = ?
     `;
     await db.queryAsync(query, [
       results.scores_state,
@@ -150,7 +144,7 @@ export async function getProposalScores(proposalId) {
       UPDATE proposals
       SET scores_state = ?,
       scores_updated = ?
-      WHERE id = ? LIMIT 1;
+      WHERE id = ?
     `;
     await db.queryAsync(query, ['invalid', ts, proposalId]);
     console.log('[scores] Proposal invalid');

@@ -23,20 +23,20 @@ export default async function(parent, args) {
   const ts = parseInt((Date.now() / 1e3).toFixed());
   const state = where.state || null;
   if (state === 'pending') {
-    queryStr += 'AND p.start > ? ';
+    queryStr += 'AND p."start" > ? ';
     params.push(ts);
   } else if (state === 'active') {
-    queryStr += 'AND p.start < ? AND p.end > ? ';
+    queryStr += 'AND p."start" < ? AND p."end" > ? ';
     params.push(ts, ts);
   } else if (state === 'closed') {
-    queryStr += 'AND p.end < ? ';
+    queryStr += 'AND p."end" < ? ';
     params.push(ts);
   }
 
   let orderBy = args.orderBy || 'created';
   let orderDirection = args.orderDirection || 'desc';
   if (!['created', 'start', 'end'].includes(orderBy)) orderBy = 'created';
-  orderBy = `p.${orderBy}`;
+  const orderByCol = ['start', 'end'].includes(orderBy) ? `p."${orderBy}"` : `p.${orderBy}`;
   orderDirection = orderDirection.toUpperCase();
   if (!['ASC', 'DESC'].includes(orderDirection)) orderDirection = 'DESC';
 
@@ -47,7 +47,7 @@ export default async function(parent, args) {
     SELECT p.*, spaces.settings FROM proposals p
     INNER JOIN spaces ON spaces.id = p.space
     WHERE spaces.settings IS NOT NULL ${queryStr}
-    ORDER BY ${orderBy} ${orderDirection} LIMIT ?, ?
+    ORDER BY ${orderByCol} ${orderDirection} OFFSET ? LIMIT ?
   `;
   try {
     const proposals = await db.queryAsync(query, params);

@@ -66,6 +66,16 @@ type Query {
   plugins: [Item]
 
   strategies: [StrategyItem]
+
+  order(id: String): Order
+
+  orders(
+    first: Int
+    skip: Int
+    where: OrderWhere
+    orderBy: String
+    orderDirection: OrderDirection
+  ): [Order]
 }
 
 input SpaceWhere {
@@ -320,4 +330,32 @@ type StrategyItem {
   examples: [Any]
   about: String
   spacesCount: Int
+}
+
+input OrderWhere {
+  id: String
+  id_in: [String]
+  voter: String
+  voter_in: [String]
+  space: String
+  space_in: [String]
+  market_id: String
+  market_id_in: [String]
+  created_gt: Int
+  created_lt: Int
+}
+
+type Order {
+  id: String!
+  ipfs: String
+  voter: String!
+  created: Int!
+  space: String!
+  marketId: String!
+  side: Int!
+  price: String!
+  amount: String!
+  txHash: String!
+  network: String!
+  sig: String
 }

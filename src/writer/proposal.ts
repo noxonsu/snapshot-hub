@@ -11,9 +11,9 @@ const proposalMonthLimit = 320;
 async function getRecentProposalsCount(space) {
   const query = `
     SELECT
-    COUNT(IF(created > (UNIX_TIMESTAMP() - 86400), 1, NULL)) AS count_1d,
+    COUNT(CASE WHEN created > (EXTRACT(EPOCH FROM NOW())::int - 86400) THEN 1 END) AS count_1d,
     COUNT(*) AS count_30d
-    FROM proposals WHERE space = ? AND created > (UNIX_TIMESTAMP() - 2592000)
+    FROM proposals WHERE space = ? AND created > (EXTRACT(EPOCH FROM NOW())::int - 2592000)
   `;
   return await db.queryAsync(query, [space]);
 }
@@ -87,19 +87,12 @@ export async function action(body, ipfs, receipt, id): Promise<void> {
   const msg = jsonParse(body.msg);
   const space = msg.space;
 
-  await db.queryAsync('INSERT IGNORE INTO messages SET ?', [
-    {
-      id,
-      ipfs,
-      address: body.address,
-      version: msg.version,
-      timestamp: msg.timestamp,
-      space,
-      type: 'proposal',
-      sig: body.sig,
-      receipt
-    }
-  ]);
+  await db.queryAsync(
+    `INSERT INTO messages (id, ipfs, address, version, "timestamp", space, type, sig, receipt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO NOTHING`,
+    [id, ipfs, body.address, msg.version, msg.timestamp, space, 'proposal', body.sig, receipt]
+  );
 
   /* Store the proposal in dedicated table 'proposals' */
   const spaceSettings = spaces[space];
@@ -113,63 +106,50 @@ export async function action(body, ipfs, receipt, id): Promise<void> {
   const network = metadata.network || spaceSettings.network;
   const proposalSnapshot = parseInt(msg.payload.snapshot || '0');
 
-  const proposal = {
-    id,
-    ipfs,
-    author,
-    created,
-    space,
-    network,
-    type: msg.payload.type || 'single-choice',
-    strategies,
-    plugins,
-    title: msg.payload.name,
-    body: msg.payload.body,
-    choices: JSON.stringify(msg.payload.choices),
-    start: parseInt(msg.payload.start || '0'),
-    end: parseInt(msg.payload.end || '0'),
-    snapshot: proposalSnapshot || 0,
-    scores: JSON.stringify([]),
-    scores_by_strategy: JSON.stringify([]),
-    scores_state: '',
-    scores_total: 0,
-    scores_updated: 0,
-    votes: 0,
-    whitelist: JSON.stringify(msg.payload.metadata.whitelist),
-  };
-  let query = 'INSERT IGNORE INTO proposals SET ?; ';
-  const params: any[] = [proposal];
+  const proposalTitle = msg.payload.name;
+  const proposalBody = msg.payload.body;
+  const proposalChoices = JSON.stringify(msg.payload.choices);
+  const proposalStart = parseInt(msg.payload.start || '0');
+  const proposalEnd = parseInt(msg.payload.end || '0');
+  const proposalSnapshotVal = proposalSnapshot || 0;
+  const proposalType = msg.payload.type || 'single-choice';
+  const proposalScores = JSON.stringify([]);
+  const proposalScoresByStrategy = JSON.stringify([]);
+  const proposalWhitelist = JSON.stringify(msg.payload.metadata.whitelist);
+
+  await db.queryAsync(
+    `INSERT INTO proposals (id, ipfs, author, created, space, network, type, strategies, plugins, title, body, choices, "start", "end", snapshot, scores, scores_by_strategy, scores_state, scores_total, scores_updated, votes, whitelist)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO NOTHING`,
+    [id, ipfs, author, created, space, network, proposalType, strategies, plugins, proposalTitle, proposalBody, proposalChoices, proposalStart, proposalEnd, proposalSnapshotVal, proposalScores, proposalScoresByStrategy, '', 0, 0, 0, proposalWhitelist]
+  );
 
   /* Store events in database */
-  const event = {
-    id: `proposal/${id}`,
-    space
-  };
+  const eventId = `proposal/${id}`;
   const ts = Date.now() / 1e3;
 
-  query += 'INSERT IGNORE INTO events SET ?; ';
-  params.push({
-    event: 'proposal/created',
-    expire: proposal.created,
-    ...event
-  });
+  await db.queryAsync(
+    `INSERT INTO events (id, space, event, expire)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT DO NOTHING`,
+    [eventId, space, 'proposal/created', created]
+  );
 
-  query += 'INSERT IGNORE INTO events SET ?; ';
-  params.push({
-    event: 'proposal/start',
-    expire: proposal.start,
-    ...event
-  });
+  await db.queryAsync(
+    `INSERT INTO events (id, space, event, expire)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT DO NOTHING`,
+    [eventId, space, 'proposal/start', proposalStart]
+  );
 
-  if (proposal.end > ts) {
-    query += 'INSERT IGNORE INTO events SET ?; ';
-    params.push({
-      event: 'proposal/end',
-      expire: proposal.end,
-      ...event
-    });
+  if (proposalEnd > ts) {
+    await db.queryAsync(
+      `INSERT INTO events (id, space, event, expire)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT DO NOTHING`,
+      [eventId, space, 'proposal/end', proposalEnd]
+    );
   }
 
-  await db.queryAsync(query, params);
   console.log('Store proposal complete', space, id);
 }

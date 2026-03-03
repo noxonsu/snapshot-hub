@@ -31,7 +31,7 @@ export default async function(parent, args) {
     SELECT f.*, spaces.settings FROM follows f
     INNER JOIN spaces ON spaces.id = f.space
     WHERE spaces.settings IS NOT NULL ${queryStr}
-    ORDER BY ${orderBy} ${orderDirection} LIMIT ?, ?
+    ORDER BY ${orderBy} ${orderDirection} OFFSET ? LIMIT ?
   `;
   try {
     follows = await db.queryAsync(query, params);

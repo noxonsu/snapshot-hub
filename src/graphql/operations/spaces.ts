@@ -14,7 +14,7 @@ export default async function(_parent, args) {
     }
     const fieldIn = where[`${field}_in`] || [];
     if (fieldIn.length > 0) {
-      queryStr += `AND s.${field} IN (?) `;
+      queryStr += `AND s.${field} = ANY(?) `;
       params.push(fieldIn);
     }
   });
@@ -35,7 +35,7 @@ export default async function(_parent, args) {
     SELECT s.* FROM spaces s
     WHERE 1 = 1 ${queryStr}
     GROUP BY s.id
-    ORDER BY s.${orderBy} ${orderDirection} LIMIT ?, ?
+    ORDER BY s.${orderBy} ${orderDirection} OFFSET ? LIMIT ?
   `;
   try {
     const spaces = await db.queryAsync(query, params);

@@ -45,7 +45,7 @@ export default async function(parent, args, context?, info?) {
       v.voter = v2.voter AND v.proposal = v2.proposal
       AND ((v.created < v2.created) OR (v.created = v2.created AND v.id < v2.id))
     WHERE v2.voter IS NULL AND v.cb = 0 ${queryStr}
-    ORDER BY ${orderBy} ${orderDirection} LIMIT ?, ?
+    ORDER BY ${orderBy} ${orderDirection} OFFSET ? LIMIT ?
   `;
   try {
     votes = await db.queryAsync(query, params);
@@ -61,7 +61,7 @@ export default async function(parent, args, context?, info?) {
       .filter((v, i, a) => a.indexOf(v) === i);
     const query = `
       SELECT id, settings FROM spaces
-      WHERE id IN (?) AND settings IS NOT NULL
+      WHERE id = ANY(?) AND settings IS NOT NULL
     `;
     try {
       let spaces = await db.queryAsync(query, [spaceIds]);
@@ -85,7 +85,7 @@ export default async function(parent, args, context?, info?) {
     const query = `
       SELECT p.*, spaces.settings FROM proposals p
       INNER JOIN spaces ON spaces.id = p.space
-      WHERE spaces.settings IS NOT NULL AND p.id IN (?)
+      WHERE spaces.settings IS NOT NULL AND p.id = ANY(?)
     `;
     try {
       let proposals = await db.queryAsync(query, [proposalIds]);

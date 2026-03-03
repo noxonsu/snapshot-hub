@@ -100,7 +100,7 @@ async function processEvents(subscribers) {
 
     try {
       await db.queryAsync(
-        'DELETE FROM events WHERE id = ? AND event = ? LIMIT 1',
+        'DELETE FROM events WHERE ctid = (SELECT ctid FROM events WHERE id = ? AND event = ? LIMIT 1)',
         [event.id, event.event]
       );
       console.log(`[events] Event sent ${event.id} ${event.event}`);

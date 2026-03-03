@@ -28,7 +28,7 @@ export default async function(parent, args) {
   const query = `
     SELECT a.* FROM aliases a
     WHERE id IS NOT NULL ${queryStr}
-    ORDER BY ${orderBy} ${orderDirection} LIMIT ?, ?
+    ORDER BY ${orderBy} ${orderDirection} OFFSET ? LIMIT ?
   `;
   try {
     return await db.queryAsync(query, params);

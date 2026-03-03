@@ -129,22 +129,19 @@ export async function action(body, ipfs, receipt, id): Promise<void> {
   //
 
   // Store message
-  const query = 'INSERT IGNORE INTO messages SET ?';
-  await db.queryAsync(query, [
-    {
-      id,
-      ipfs,
-      address: voter,
-      version: msg.version,
-      timestamp: msg.timestamp,
-      space: msg.space,
-      type: 'vote',
-      sig: body.sig,
-      receipt
-    }
-  ]);
+  await db.queryAsync(
+    `INSERT INTO messages (id, ipfs, address, version, "timestamp", space, type, sig, receipt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO NOTHING`,
+    [id, ipfs, voter, msg.version, msg.timestamp, msg.space, 'vote', body.sig, receipt]
+  );
 
   // Store vote in dedicated table
-  await db.queryAsync('INSERT IGNORE INTO votes SET ?', params);
+  await db.queryAsync(
+    `INSERT INTO votes (id, ipfs, voter, created, space, proposal, choice, metadata, vp, vp_by_strategy, vp_state, cb)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO NOTHING`,
+    [params.id, params.ipfs, params.voter, params.created, params.space, params.proposal, params.choice, params.metadata, params.vp, params.vp_by_strategy, params.vp_state, params.cb]
+  );
   console.log('[writer] Store vote complete', msg.space, id, ipfs);
 }

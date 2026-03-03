@@ -22,26 +22,32 @@ export async function action(body): Promise<void> {
   const id = msg.payload.proposal;
 
   const ts = parseInt((Date.now() / 1e3).toFixed());
-  const event = {
-    id: `proposal/${id}`,
-    space: msg.space,
-    event: 'proposal/deleted',
-    expire: ts
-  };
+  const eventId = `proposal/${id}`;
 
-  const query = `
-    UPDATE messages SET type = ? WHERE id = ? AND type = 'proposal' LIMIT 1;
-    DELETE FROM proposals WHERE id = ? LIMIT 1;
-    DELETE FROM votes WHERE proposal = ?;
-    DELETE FROM events WHERE id = ?;
-    INSERT IGNORE INTO events SET ?;
-  `;
-  await db.queryAsync(query, [
-    'archive-proposal',
-    id,
-    id,
-    id,
-    `proposal/${id}`,
-    event
-  ]);
+  await db.queryAsync(
+    `UPDATE messages SET type = ? WHERE ctid = (SELECT ctid FROM messages WHERE id = ? AND type = 'proposal' LIMIT 1)`,
+    ['archive-proposal', id]
+  );
+
+  await db.queryAsync(
+    `DELETE FROM proposals WHERE ctid = (SELECT ctid FROM proposals WHERE id = ? LIMIT 1)`,
+    [id]
+  );
+
+  await db.queryAsync(
+    `DELETE FROM votes WHERE proposal = ?`,
+    [id]
+  );
+
+  await db.queryAsync(
+    `DELETE FROM events WHERE id = ?`,
+    [eventId]
+  );
+
+  await db.queryAsync(
+    `INSERT INTO events (id, space, event, expire)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT DO NOTHING`,
+    [eventId, msg.space, 'proposal/deleted', ts]
+  );
 }

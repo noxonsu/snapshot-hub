@@ -3,6 +3,8 @@ import { createHash } from 'crypto';
 import snapshot from '@snapshot-labs/snapshot.js';
 
 export function jsonParse(input, fallback?) {
+  // PostgreSQL JSONB returns already-parsed objects; handle both cases
+  if (input !== null && typeof input === 'object') return input;
   try {
     return JSON.parse(input);
   } catch (err) {

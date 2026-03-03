@@ -6,13 +6,14 @@ export async function verify(message): Promise<any> {
 }
 
 export async function action(message, ipfs, receipt, id): Promise<void> {
-  const params = {
-    id,
-    ipfs,
-    address: getAddress(message.from),
-    alias: getAddress(message.alias),
-    created: message.timestamp
-  };
-  await db.queryAsync('INSERT IGNORE INTO aliases SET ?', params);
+  const address = getAddress(message.from);
+  const alias = getAddress(message.alias);
+  const created = message.timestamp;
+  await db.queryAsync(
+    `INSERT INTO aliases (id, ipfs, address, alias, created)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO NOTHING`,
+    [id, ipfs, address, alias, created]
+  );
   console.log(`[writer] Stored: ${message.from} alias ${message.alias}`);
 }

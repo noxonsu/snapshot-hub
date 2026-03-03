@@ -14,6 +14,13 @@ import { recoverPublicKey2 } from '../personalSign/utils'
 const NAME = 'snapshot';
 const VERSION = '0.1.4';
 
+// Hash of Order EIP-712 types for PolyFactory CLOB orders (BSC Testnet, chainId 97)
+// Computed from: sha256(JSON.stringify({ Order: [...fields] }))
+const ORDER_TYPES_HASH = '56dcb9c7a34e6235f7788af0ec44401050ded3ecc8349bfcc0d988d9877f40eb';
+
+// Legacy proposal hash (kept from original code)
+const PROPOSAL_TYPES_HASH = 'fa83259e322a553b0b18285fe26580eaff64ad16541325a9f4ed18960d1f934f';
+
 export default async function ingestor(body) {
   const schemaIsValid = snapshot.utils.validateSchema(envelope, body);
   if (schemaIsValid !== true) {
@@ -41,13 +48,19 @@ export default async function ingestor(body) {
 
   const hash = sha256(JSON.stringify(types));
 
-  if (!Object.keys(hashTypes).includes(hash) && hash!='fa83259e322a553b0b18285fe26580eaff64ad16541325a9f4ed18960d1f934f')
+  if (
+    !Object.keys(hashTypes).includes(hash) &&
+    hash !== PROPOSAL_TYPES_HASH &&
+    hash !== ORDER_TYPES_HASH
+  )
     return Promise.reject('wrong types');
-    
-  let type = (hash) == 'fa83259e322a553b0b18285fe26580eaff64ad16541325a9f4ed18960d1f934f' ? 'proposal' : hashTypes[hash];
+
+  let type = hash === PROPOSAL_TYPES_HASH ? 'proposal'
+           : hash === ORDER_TYPES_HASH ? 'order'
+           : hashTypes[hash];
 
   if (
-    !['settings', 'alias'].includes(type) &&
+    !['settings', 'alias', 'order'].includes(type) &&
     (!message.space || !spaces[message.space])
   )
     return Promise.reject('unknown space');
@@ -75,9 +88,9 @@ export default async function ingestor(body) {
       types: body.data.types,
       value: body.data.message,
     }
-    
+
     const jsonMsg = JSON.stringify(sourceData)
-    
+
     try {
       const signer = recoverPublicKey2(body.sig, jsonMsg);
       if (body.address.toLowerCase() !== signer.toLowerCase()) {
@@ -89,7 +102,7 @@ export default async function ingestor(body) {
   }
   console.log('[ingestor] Signature is valid');
 
-  let payload = {};
+  let payload: any = {};
 
   if (type === 'settings') payload = JSON.parse(message.settings);
 
@@ -123,12 +136,23 @@ export default async function ingestor(body) {
     type = 'vote';
   }
 
-  let legacyBody = {
+  if (type === 'order') {
+    payload = {
+      marketId: message.marketId,
+      side:     message.side,
+      price:    message.price,
+      amount:   message.amount,
+      txHash:   message.txHash,
+      network:  message.network
+    };
+  }
+
+  let legacyBody: any = {
     address: body.address,
     msg: JSON.stringify({
       version: domain.version,
       timestamp: message.timestamp,
-      space: message.space,
+      space: message.space || 'polyfactory.eth',
       type,
       payload
     }),
@@ -150,10 +174,17 @@ export default async function ingestor(body) {
   // @TODO gossip to typed data endpoint
   // gossip(body, message.space);
 
-  const [ipfs, receipt] = await Promise.all([
-    pinJson(`snapshot/${body.sig}`, body),
-    issueReceipt(body.sig)
-  ]);
+  // Skip IPFS pinning for order type (no Fleek/Pinata keys configured; signature is proof)
+  let ipfs = '';
+  let receipt = '';
+  if (type !== 'order') {
+    const results = await Promise.all([
+      pinJson(`snapshot/${body.sig}`, body),
+      issueReceipt(body.sig)
+    ]);
+    ipfs = results[0];
+    receipt = results[1];
+  }
 
   try {
     await writer[type].action(legacyBody, ipfs, receipt, id);

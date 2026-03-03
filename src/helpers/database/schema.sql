@@ -4,141 +4,142 @@ CREATE TABLE hubs (
   is_self INT DEFAULT 0,
   is_active INT DEFAULT 1,
   scope TEXT NOT NULL,
-  PRIMARY KEY (host),
-  INDEX address (address),
-  INDEX is_self (is_self),
-  INDEX is_active (is_active)
+  PRIMARY KEY (host)
 );
+CREATE INDEX idx_hubs_address ON hubs (address);
+CREATE INDEX idx_hubs_is_self ON hubs (is_self);
+CREATE INDEX idx_hubs_is_active ON hubs (is_active);
 
 CREATE TABLE messages (
   id VARCHAR(66) NOT NULL,
   ipfs VARCHAR(64) NOT NULL,
   address VARCHAR(64) NOT NULL,
   version VARCHAR(6) NOT NULL,
-  timestamp BIGINT NOT NULL,
+  "timestamp" BIGINT NOT NULL,
   space VARCHAR(64),
   type VARCHAR(24) NOT NULL,
   sig VARCHAR(256) NOT NULL,
   receipt VARCHAR(128) NOT NULL,
-  PRIMARY KEY (id),
-  INDEX ipfs (ipfs),
-  INDEX address (address),
-  INDEX version (version),
-  INDEX timestamp (timestamp),
-  INDEX space (space),
-  INDEX type (type),
-  INDEX receipt (receipt)
+  PRIMARY KEY (id)
 );
+CREATE INDEX idx_messages_ipfs ON messages (ipfs);
+CREATE INDEX idx_messages_address ON messages (address);
+CREATE INDEX idx_messages_version ON messages (version);
+CREATE INDEX idx_messages_timestamp ON messages ("timestamp");
+CREATE INDEX idx_messages_space ON messages (space);
+CREATE INDEX idx_messages_type ON messages (type);
+CREATE INDEX idx_messages_receipt ON messages (receipt);
 
 CREATE TABLE spaces (
   id VARCHAR(64) NOT NULL,
-  settings JSON,
-  verified INT NOT NULL DEFAULT '0',
+  settings JSONB,
+  verified INT NOT NULL DEFAULT 0,
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL,
-  PRIMARY KEY (id),
-  INDEX verified (verified),
-  INDEX created_at (created_at),
-  INDEX updated_at (updated_at)
+  PRIMARY KEY (id)
 );
+CREATE INDEX idx_spaces_verified ON spaces (verified);
+CREATE INDEX idx_spaces_created_at ON spaces (created_at);
+CREATE INDEX idx_spaces_updated_at ON spaces (updated_at);
 
 CREATE TABLE proposals (
   id VARCHAR(66) NOT NULL,
   ipfs VARCHAR(64) NOT NULL,
   author VARCHAR(64) NOT NULL,
-  created INT(11) NOT NULL,
+  created INT NOT NULL,
   space VARCHAR(64) NOT NULL,
   network VARCHAR(12) NOT NULL,
   type VARCHAR(24) NOT NULL,
-  strategies JSON NOT NULL,
-  plugins JSON NOT NULL,
+  strategies JSONB NOT NULL,
+  plugins JSONB NOT NULL,
   title TEXT NOT NULL,
-  body MEDIUMTEXT NOT NULL,
-  choices JSON NOT NULL,
-  start INT(11) NOT NULL,
-  end INT(11) NOT NULL,
-  snapshot INT(24) NOT NULL,
-  scores JSON NOT NULL,
-  scores_by_strategy JSON NOT NULL,
+  body TEXT NOT NULL,
+  choices JSONB NOT NULL,
+  "start" INT NOT NULL,
+  "end" INT NOT NULL,
+  snapshot INT NOT NULL,
+  scores JSONB NOT NULL,
+  scores_by_strategy JSONB NOT NULL,
   scores_state VARCHAR(24) NOT NULL,
   scores_total DECIMAL(64,30) NOT NULL,
-  scores_updated INT(11) NOT NULL,
-  votes INT(12) NOT NULL,
-  PRIMARY KEY (id),
-  INDEX ipfs (ipfs),
-  INDEX author (author),
-  INDEX created (created),
-  INDEX network (network),
-  INDEX space (space),
-  INDEX start (start),
-  INDEX end (end),
-  INDEX scores_state (scores_state),
-  INDEX scores_updated (scores_updated),
-  INDEX votes (votes)
+  scores_updated INT NOT NULL,
+  votes INT NOT NULL,
+  whitelist TEXT,
+  PRIMARY KEY (id)
 );
+CREATE INDEX idx_proposals_ipfs ON proposals (ipfs);
+CREATE INDEX idx_proposals_author ON proposals (author);
+CREATE INDEX idx_proposals_created ON proposals (created);
+CREATE INDEX idx_proposals_network ON proposals (network);
+CREATE INDEX idx_proposals_space ON proposals (space);
+CREATE INDEX idx_proposals_start ON proposals ("start");
+CREATE INDEX idx_proposals_end ON proposals ("end");
+CREATE INDEX idx_proposals_scores_state ON proposals (scores_state);
+CREATE INDEX idx_proposals_scores_updated ON proposals (scores_updated);
+CREATE INDEX idx_proposals_votes ON proposals (votes);
 
 CREATE TABLE votes (
   id VARCHAR(66) NOT NULL,
   ipfs VARCHAR(64) NOT NULL,
   voter VARCHAR(64) NOT NULL,
-  created INT(11) NOT NULL,
+  created INT NOT NULL,
   space VARCHAR(64) NOT NULL,
   proposal VARCHAR(66) NOT NULL,
-  choice JSON NOT NULL,
-  metadata JSON NOT NULL,
+  choice JSONB NOT NULL,
+  metadata JSONB NOT NULL,
   vp DECIMAL(64,30) NOT NULL,
-  vp_by_strategy JSON NOT NULL,
+  vp_by_strategy JSONB NOT NULL,
   vp_state VARCHAR(24) NOT NULL,
-  cb INT(11) NOT NULL,
-  PRIMARY KEY (id),
-  INDEX ipfs (ipfs),
-  INDEX voter (voter),
-  INDEX created (created),
-  INDEX space (space),
-  INDEX proposal (proposal),
-  INDEX vp (vp),
-  INDEX vp_state (vp_state),
-  INDEX cb (cb)
+  cb INT NOT NULL,
+  PRIMARY KEY (id)
 );
+CREATE INDEX idx_votes_ipfs ON votes (ipfs);
+CREATE INDEX idx_votes_voter ON votes (voter);
+CREATE INDEX idx_votes_created ON votes (created);
+CREATE INDEX idx_votes_space ON votes (space);
+CREATE INDEX idx_votes_proposal ON votes (proposal);
+CREATE INDEX idx_votes_vp ON votes (vp);
+CREATE INDEX idx_votes_vp_state ON votes (vp_state);
+CREATE INDEX idx_votes_cb ON votes (cb);
 
 CREATE TABLE events (
   id VARCHAR(128) NOT NULL,
   event VARCHAR(64) NOT NULL,
   space VARCHAR(64) NOT NULL,
-  expire INT(11) NOT NULL,
-  PRIMARY KEY (id, event),
-  INDEX space (space),
-  INDEX expire (expire)
+  expire INT NOT NULL,
+  PRIMARY KEY (id, event)
 );
+CREATE INDEX idx_events_space ON events (space);
+CREATE INDEX idx_events_expire ON events (expire);
 
 CREATE TABLE follows (
   id VARCHAR(66) NOT NULL,
   ipfs VARCHAR(64) NOT NULL,
   follower VARCHAR(64) NOT NULL,
   space VARCHAR(64) NOT NULL,
-  created INT(11) NOT NULL,
-  PRIMARY KEY (follower, space),
-  INDEX ipfs (ipfs),
-  INDEX created (created)
+  created INT NOT NULL,
+  PRIMARY KEY (follower, space)
 );
+CREATE INDEX idx_follows_ipfs ON follows (ipfs);
+CREATE INDEX idx_follows_created ON follows (created);
 
 CREATE TABLE aliases (
   id VARCHAR(66) NOT NULL,
   ipfs VARCHAR(64) NOT NULL,
   address VARCHAR(64) NOT NULL,
   alias VARCHAR(64) NOT NULL,
-  created INT(11) NOT NULL,
-  PRIMARY KEY (address, alias),
-  INDEX ipfs (ipfs)
+  created INT NOT NULL,
+  PRIMARY KEY (address, alias)
 );
+CREATE INDEX idx_aliases_ipfs ON aliases (ipfs);
 
 CREATE TABLE subscriptions (
   id VARCHAR(66) NOT NULL,
   ipfs VARCHAR(64) NOT NULL,
   address VARCHAR(64) NOT NULL,
   space VARCHAR(64) NOT NULL,
-  created INT(11) NOT NULL,
-  PRIMARY KEY (address, space),
-  INDEX ipfs (ipfs),
-  INDEX created (created)
+  created INT NOT NULL,
+  PRIMARY KEY (address, space)
 );
+CREATE INDEX idx_subscriptions_ipfs ON subscriptions (ipfs);
+CREATE INDEX idx_subscriptions_created ON subscriptions (created);

@@ -31,7 +31,7 @@ export default async function(parent, args) {
     SELECT s.*, spaces.settings FROM subscriptions s
     INNER JOIN spaces ON spaces.id = s.space
     WHERE spaces.settings IS NOT NULL ${queryStr}
-    ORDER BY ${orderBy} ${orderDirection} LIMIT ?, ?
+    ORDER BY ${orderBy} ${orderDirection} OFFSET ? LIMIT ?
   `;
   try {
     subscriptions = await db.queryAsync(query, params);

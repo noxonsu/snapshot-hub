@@ -64,17 +64,28 @@ export function formatSubscription(subscription) {
   return subscription;
 }
 
+// Reserved words in PostgreSQL that need double-quoting when used as column names
+const PG_RESERVED = new Set(['start', 'end', 'timestamp', 'type', 'order', 'default', 'check', 'primary', 'user']);
+
+function quoteCol(alias: string, field: string): string {
+  if (PG_RESERVED.has(field)) {
+    return `${alias}."${field}"`;
+  }
+  return `${alias}.${field}`;
+}
+
 export function buildWhereQuery(fields, alias, where) {
   let query: any = '';
   const params: any[] = [];
   Object.entries(fields).forEach(([field, type]) => {
+    const col = quoteCol(alias, field);
     if (where[field]) {
-      query += `AND ${alias}.${field} = ? `;
+      query += `AND ${col} = ? `;
       params.push(where[field]);
     }
     const fieldIn = where[`${field}_in`] || [];
     if (fieldIn.length > 0) {
-      query += `AND ${alias}.${field} IN (?) `;
+      query += `AND ${col} = ANY(?) `;
       params.push(fieldIn);
     }
     if (type === 'number') {
@@ -83,19 +94,19 @@ export function buildWhereQuery(fields, alias, where) {
       const fieldLt = where[`${field}_lt`];
       const fieldLte = where[`${field}_lte`];
       if (fieldGt) {
-        query += `AND ${alias}.${field} > ? `;
+        query += `AND ${col} > ? `;
         params.push(fieldGt);
       }
       if (fieldGte) {
-        query += `AND ${alias}.${field} >= ? `;
+        query += `AND ${col} >= ? `;
         params.push(fieldGte);
       }
       if (fieldLt) {
-        query += `AND ${alias}.${field} < ? `;
+        query += `AND ${col} < ? `;
         params.push(fieldLt);
       }
       if (fieldLte) {
-        query += `AND ${alias}.${field} <= ? `;
+        query += `AND ${col} <= ? `;
         params.push(fieldLte);
       }
     }

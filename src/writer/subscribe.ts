@@ -6,13 +6,14 @@ export async function verify(): Promise<any> {
 }
 
 export async function action(message, ipfs, receipt, id): Promise<void> {
-  const params = {
-    id,
-    ipfs,
-    address: getAddress(message.from),
-    space: message.space,
-    created: message.timestamp
-  };
-  await db.queryAsync('INSERT IGNORE INTO subscriptions SET ?', params);
+  const address = getAddress(message.from);
+  const space = message.space;
+  const created = message.timestamp;
+  await db.queryAsync(
+    `INSERT INTO subscriptions (id, ipfs, address, space, created)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (id) DO NOTHING`,
+    [id, ipfs, address, space, created]
+  );
   console.log(`[writer] Stored: ${message.from} subscribed ${message.space}`);
 }
