@@ -199,7 +199,7 @@ maybe('Integration: write order → read back via GraphQL', () => {
   test('written order appears in GraphQL within 500ms', async () => {
     await new Promise(r => setTimeout(r, 500));
     const json = await graphql(
-      `{ orders(first: 50, where: { voter: "${TEST_WALLET.address.toLowerCase()}" }) { id marketId voter } }`
+      `{ orders(first: 50, where: { voter: "${TEST_WALLET.address}" }) { id marketId voter } }`
     );
     const found = json.data.orders.find(o => o.marketId === UNIQUE_MARKET_ID);
     // If write succeeded (not duplicate), it should appear
