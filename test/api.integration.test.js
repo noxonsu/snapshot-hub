@@ -48,7 +48,7 @@ function makeMessage(overrides = {}) {
   return {
     from:      TEST_WALLET.address,
     space:     'polyfactory.eth',
-    timestamp: Math.floor(Date.now() / 1000).toString(),
+    timestamp: Math.floor(Date.now() / 1000),
     marketId:  '1',
     side:      '0',
     price:     '6000',
