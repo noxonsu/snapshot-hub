@@ -4,8 +4,10 @@
  * Requires running server + PostgreSQL:
  *   INTEGRATION=1 npm test
  *
- * Skipped automatically in CI (no INTEGRATION env var set).
+ * Skipped automatically in CI unless INTEGRATION=1 env var is set.
  * Run locally after: pm2 start snapshot-hub (port 3700)
+ *
+ * Uses EIP-712 typed-data format (same as snapshot-storage.js frontend module).
  */
 
 const fetch = require('node-fetch');
@@ -22,33 +24,58 @@ const TEST_WALLET = new Wallet(
 // describe.skip when not in integration mode — tests appear in report as skipped, not absent
 const maybe = INTEGRATION ? describe : describe.skip;
 
+// ─── EIP-712 Order types (must match snapshot-storage.js / ingestor ORDER_TYPES_HASH) ──
+
+const ORDER_TYPES = {
+  Order: [
+    { name: 'from',      type: 'address' },
+    { name: 'space',     type: 'string'  },
+    { name: 'timestamp', type: 'uint64'  },
+    { name: 'marketId',  type: 'string'  },
+    { name: 'side',      type: 'string'  },
+    { name: 'price',     type: 'string'  },
+    { name: 'amount',    type: 'string'  },
+    { name: 'txHash',    type: 'string'  },
+    { name: 'network',   type: 'string'  },
+  ]
+};
+
+const ORDER_DOMAIN = { name: 'snapshot', version: '0.1.4' };
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function makeOrderMsg(overrides = {}) {
+function makeMessage(overrides = {}) {
   return {
-    version: '0.1.4',
+    from:      TEST_WALLET.address,
+    space:     'polyfactory.eth',
     timestamp: Math.floor(Date.now() / 1000).toString(),
-    space: 'polyfactory.eth',
-    type: 'order',
-    payload: {
-      marketId: '1',
-      side: '0',
-      price: '6000',
-      amount: '10000000000000000000',
-      txHash: '0x' + 'a'.repeat(64),
-      network: '97',
-      ...overrides,
-    },
+    marketId:  '1',
+    side:      '0',
+    price:     '6000',
+    amount:    '10000000000000000000',
+    txHash:    '0x' + 'a'.repeat(64),
+    network:   '97',
+    ...overrides,
   };
 }
 
-async function postMsg(msgObj, wallet = TEST_WALLET) {
-  const msgStr = JSON.stringify(msgObj);
-  const sig = await wallet.signMessage(msgStr);
+/**
+ * Sign and post an order to /api/msg (EIP-712 typed-data format).
+ * @param {object} msgOverrides - Fields to override in the message
+ * @param {Wallet} wallet - Signing wallet
+ * @param {string|null} claimAddress - Override the posted address (for tamper tests)
+ */
+async function postOrder(msgOverrides = {}, wallet = TEST_WALLET, claimAddress = null) {
+  const message = makeMessage({ from: wallet.address, ...msgOverrides });
+  const sig = await wallet._signTypedData(ORDER_DOMAIN, ORDER_TYPES, message);
   return fetch(`${HUB}/api/msg`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ msg: msgStr, address: wallet.address, sig }),
+    body: JSON.stringify({
+      address: claimAddress || wallet.address,
+      sig,
+      data: { domain: ORDER_DOMAIN, types: ORDER_TYPES, message }
+    }),
   });
 }
 
@@ -77,44 +104,34 @@ maybe('Integration: GET /api', () => {
 
 maybe('Integration: POST /api/msg — order', () => {
   test('accepts valid signed order → 200 or 400 (not 500)', async () => {
-    const res = await postMsg(makeOrderMsg());
+    const res = await postOrder();
     expect(res.status).not.toBe(500);
     // 200 = saved, 400 = duplicate msg or validation error (both acceptable in test env)
     expect([200, 400]).toContain(res.status);
   });
 
   test('rejects order with missing marketId → 400', async () => {
-    const msg = makeOrderMsg({ marketId: '' });
-    const res = await postMsg(msg);
+    const res = await postOrder({ marketId: '' });
     expect(res.status).toBe(400);
   });
 
   test('rejects order with missing txHash → 400', async () => {
-    const msg = makeOrderMsg({ txHash: '' });
-    const res = await postMsg(msg);
+    const res = await postOrder({ txHash: '' });
     expect(res.status).toBe(400);
   });
 
   test('rejects order with wrong network (1 = mainnet) → 400', async () => {
-    const msg = makeOrderMsg({ network: '1' });
-    const res = await postMsg(msg);
+    const res = await postOrder({ network: '1' });
     expect(res.status).toBe(400);
   });
 
-  test('rejects tampered message (sig mismatch) → 400', async () => {
-    const msgObj = makeOrderMsg();
-    const msgStr = JSON.stringify(msgObj);
-    // Sign with one wallet, claim another address
-    const sig = await TEST_WALLET.signMessage(msgStr);
-    const res = await fetch(`${HUB}/api/msg`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        msg: msgStr,
-        address: '0x1111111111111111111111111111111111111111',
-        sig,
-      }),
-    });
+  test('rejects tampered message (address mismatch) → 400', async () => {
+    // Sign with TEST_WALLET but claim a different address
+    const res = await postOrder(
+      {},
+      TEST_WALLET,
+      '0x1111111111111111111111111111111111111111'
+    );
     expect(res.status).toBe(400);
   });
 });
@@ -124,7 +141,7 @@ maybe('Integration: POST /api/msg — order', () => {
 maybe('Integration: GraphQL orders query', () => {
   test('orders query returns valid shape with empty or filled array', async () => {
     const json = await graphql(
-      `{ orders(first: 5) { id voter space marketId side price amount txHash network timestamp } }`
+      `{ orders(first: 5) { id voter space marketId side price amount txHash network created } }`
     );
     expect(json).toHaveProperty('data');
     expect(json.data).toHaveProperty('orders');
@@ -171,8 +188,8 @@ maybe('Integration: write order → read back via GraphQL', () => {
   const UNIQUE_MARKET_ID = `test-${Date.now()}`;
 
   beforeAll(async () => {
-    // Write an order
-    const res = await postMsg(makeOrderMsg({ marketId: UNIQUE_MARKET_ID }));
+    // Write an order with unique marketId
+    const res = await postOrder({ marketId: UNIQUE_MARKET_ID });
     // Give DB a moment to commit
     await new Promise(r => setTimeout(r, 300));
     // Accept 200 or 400 (duplicate) — just don't fail setup on duplicates
@@ -182,7 +199,7 @@ maybe('Integration: write order → read back via GraphQL', () => {
   test('written order appears in GraphQL within 500ms', async () => {
     await new Promise(r => setTimeout(r, 500));
     const json = await graphql(
-      `{ orders(first: 50, where: { voter: "${TEST_WALLET.address}" }) { id marketId voter } }`
+      `{ orders(first: 50, where: { voter: "${TEST_WALLET.address.toLowerCase()}" }) { id marketId voter } }`
     );
     const found = json.data.orders.find(o => o.marketId === UNIQUE_MARKET_ID);
     // If write succeeded (not duplicate), it should appear
