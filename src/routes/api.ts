@@ -170,7 +170,8 @@ router.post('/message', async (req, res) => {
     const result = await ingestor(req.body, 'personal-sign');
     return res.json(result);
   } catch (e) {
-    return sendError(res, e);
+    // String rejections from ingestor are validation errors (400); unexpected Errors are 500
+    return sendError(res, e, typeof e === 'string' ? 400 : 500);
   }
 });
 
@@ -179,7 +180,8 @@ router.post('/msg', async (req, res) => {
     const result = await ingestor(req.body, 'typed-data');
     return res.json(result);
   } catch (e) {
-    return sendError(res, e);
+    // String rejections from ingestor are validation errors (400); unexpected Errors are 500
+    return sendError(res, e, typeof e === 'string' ? 400 : 500);
   }
 });
 

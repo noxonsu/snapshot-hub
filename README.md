@@ -1,113 +1,117 @@
-# Snapshot hub
+# Snapshot Hub (PolyFactory fork)
 
-This is a hub for Snapshot network that stores the database and forwards new messages to peers. The hub hold a private keys to sign valid messages.
+A hub for Snapshot-like off-chain signed message storage. This fork adds:
+- **PostgreSQL** support (replaces MySQL)
+- **`order` type** — EIP-712 signed CLOB orders for [PolyFactory](https://polyfactory.wpmix.net)
+- **GraphQL** `order`/`orders` queries
 
-## Install
+## Setup
 
-1. Install Node.js (14 version is required) and yarn
-2. Clone the repository:
+### Requirements
 
-    ```sh
-    git clone https://github.com/VitaliyShulik/snapshot-hub.git
-    ```
+- Node.js 18+
+- PostgreSQL 14+
 
-3. Enter to the app directory `cd snapshot-hub` and install dependency:
+### Environment variables
 
-    ```sh
-    yarn
-    ```
+Copy `.env.example` to `.env`:
 
-4. Copy [`.env.example`](https://github.com/VitaliyShulik/snapshot-hub/blob/master/.env.example), rename it to `.env` and set a value for these config vars:
+```env
+DATABASE_URL=postgresql://snaphub:<password>@localhost:5432/snapshotdb
+RELAYER_PK=<relayer-private-key>
+PORT=3700
+```
 
-    - `DATABASE_URL`: The database connection string. You will need to run your own MySQL database (or [restore backuped db](#backup-and-restore-data-base)) or use a Cloud service like [JawsDB](https://jawsdb.com).
-    - `RELAYER_PK`: This is the private key of the hub. The hub counter-sign every accepted message with this key.
-    - `PINNING_SERVICE`: This value must be "fleek" or "pinata". The hub support [Pinata](https://pinata.cloud/) or [Fleek](https://fleek.co) IPFS pinning services.
-    - `FLEEK_API_KEY` and `FLEEK_API_SECRET` or `PINATA_API_KEY` and `PINATA_SECRET_API_KEY`: You need to setup API keys for the pinning service you've defined.
+- `DATABASE_URL` — PostgreSQL connection string
+- `RELAYER_PK` — Hub private key to counter-sign messages
+- `PORT` — HTTP port (default: 3000, production: 3700)
 
-5. Create the database schema (optional with backup and restore db)
+### Database setup
 
-Run this query on the MySQL database to create the initial schema with the required tables:
-<https://github.com/VitaliyShulik/snapshot-hub/blob/master/src/helpers/database/schema.sql>
+```sh
+# Create user and database
+psql postgres -c "CREATE USER snaphub WITH PASSWORD 'snaphub_pass_2026';"
+psql postgres -c "CREATE DATABASE snapshotdb OWNER snaphub;"
 
-## Backup and restore data base
+# Apply schema
+psql postgresql://snaphub:snaphub_pass_2026@localhost:5432/snapshotdb \
+  -f src/helpers/database/schema_pg.sql
+```
 
-1. Install MySQL (8 version is required). For ubuntu 18 I used this guide - <https://tecadmin.net/install-mysql-8-on-ubuntu-18-04/>
+### Install and run
 
-2. Create database and db user in MySQL environment on new server:
+```sh
+npm install
+pm2 start "npm start" --name snapshot-hub
+```
 
-    ```sql
-    CREATE DATABASE <db_name>;
-    CREATE USER '<db_user_name>'@'localhost' IDENTIFIED BY ‘<db_password>‘;
-    GRANT ALL PRIVILEGES ON * . * TO '<db_user_name>'@'localhost';
-    ```
+Verify: `curl http://localhost:3700/api`
 
-    - `db_password` must not contain special symbols, as it may result in an error, you can use some [generated password service](https://www.browserling.com/tools/mysql-password) and replace all special symbols to `$` if its contain.
+```json
+{
+  "name": "snapshot-hub",
+  "network": "testnet",
+  "version": "0.1.4",
+  "tag": "alpha",
+  "relayer": "0x..."
+}
+```
 
-    - In `.env` you should provide next string:
-    `mysql://<db_user_name>:<db_password>@localhost:3306/<db_name>`
+## Tests
 
-3. On old server make data base backup
+```sh
+# Unit tests (no server needed)
+npm run test:unit
 
-    ```sh
-    mysqldump <db_name> > <db_name>-$(date +%F).sql -u root -p
-    ```
+# Integration tests (requires running server + PostgreSQL)
+INTEGRATION=1 npm run test:integration
 
-    - `$(date +%F)` is sh script that generate `date-of-backup` variable.
+# All tests
+npm test
+```
 
-4. On your local computer get backup from old server:
+## Connecting a product to snapshot-hub
 
-    ```sh
-    scp <old_server_user>@<old_server_ip>:/<path-to-dump-file>/<db_name>-<date-of-backup>.sql ~/<your-local-path>
-    ```
+See **[INTEGRATION.md](./INTEGRATION.md)** for a full guide:
+- EIP-712 `order` message format
+- `snapshotSignAndSubmit` / `snapshotLoadOrders` frontend API
+- `window.MyApp_` config override pattern
+- GraphQL examples
 
-5. On your local computer move backup on new server:
+### Quick GraphQL example
 
-    ```sh
-    scp ~/<your-local-path>/<db_name>-<date-of-backup>.sql <new_server_user>@<new_server_ip>:/<path-to-dump-file>
-    ```
+```graphql
+{
+  orders(
+    first: 20
+    where: { voter: "0x...", space: "polyfactory.eth" }
+  ) {
+    id voter marketId side price amount txHash network created
+  }
+}
+```
 
-6. On new server make data base restore
+## Production deploy (VM104)
 
-    ```sh
-    mysql -u <db_user_name> -p <db_name> < /<path-to-dump-file>/<db_name>-<date-of-backup>.sql
-    ```
+```sh
+pm2 restart snapshot-hub
+# Server runs on port 3700
+# Proxied at: https://snapshot.polyfactory.wpmix.net (optional)
+```
 
-## Run
+## Backup and restore PostgreSQL
 
-1. Install pm2
+```sh
+# Backup
+pg_dump postgresql://snaphub:snaphub_pass_2026@localhost:5432/snapshotdb \
+  > snapshotdb-$(date +%F).sql
 
-2. Use this command to run the hub:
+# Restore on new server
+psql postgresql://snaphub:snaphub_pass_2026@localhost:5432/snapshotdb \
+  < snapshotdb-<date>.sql
+```
 
-    ```sh
-    pm2 start "yarn start" --name snapshot-hub
-    ```
+## Upstream
 
-3. Go on this page: <http://localhost:3000/api>  or make request with `curl http://localhost:3000/api` in server terminal and if everything is fine it should return details of the hub example:
-
-    ```json
-    {
-      "name": "snapshot-hub",
-      "network": "livenet",
-      "version": "0.1.3",
-      "tag": "alpha",
-      "relayer": "0x8BBE4Ac64246d600BC2889ef5d83809D138F03DF"
-    }
-    ```
-
-4. Set up nginx with your domain. You can follow this [guide](https://www.digitalocean.com/community/tutorials/how-to-install-nginx-on-ubuntu-20-04#step-5-%E2%80%93-setting-up-server-blocks-(recommended)).
-
-## Usage
-
-Once your hub is running online, the main hub can relay the messages received to your own hub. Please provide the URL of your Snapshot hub to an admin to make sure it's connected to the network.
-
-### Load a space setting
-
-To load a space settings in the database you can go on this endpoint <http://localhost:3000/api/spaces/yam.eth/poke> (change yam.eth with the space you want to activate).
-
-
-## for devops
-1. login to docckerator machine
-2. cd snapshot-hub
-3. pm2 stop snapshothub 
-4. git pull
-5. pm2 start snapshothub
+Forked from [snapshot-labs/snapshot-hub](https://github.com/snapshot-labs/snapshot-hub).
+MySQL→PostgreSQL migration + `order` type added locally (upstream doesn't accept BSC-specific PRs).
