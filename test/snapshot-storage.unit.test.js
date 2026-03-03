@@ -19,10 +19,11 @@ const path = require('path');
 // We eval the file with minimal stubs for window, CONFIG, ethers, document
 
 function loadSnapshotStorage(overrides = {}) {
-  const src = fs.readFileSync(
-    path.resolve(__dirname, '../../PolyFactory/frontend/snapshot-storage.js'),
-    'utf8'
-  );
+  // snapshot-storage.js is a copy from PolyFactory/frontend/snapshot-storage.js
+  // kept in test/fixtures/ so tests are self-contained in CI.
+  const srcPath = process.env.SNAPSHOT_STORAGE_JS_PATH ||
+    path.resolve(__dirname, 'fixtures/snapshot-storage.js');
+  const src = fs.readFileSync(srcPath, 'utf8');
 
   const ctx = {
     window:   overrides.window   ?? {},

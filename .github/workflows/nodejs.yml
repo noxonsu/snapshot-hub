@@ -71,6 +71,8 @@ jobs:
         env:
           DATABASE_URL: postgresql://snaphub:snaphub_ci@localhost:5432/snapshotdb
           PORT: 3700
+          # Hardhat test key #0 — never use on mainnet
+          RELAYER_PK: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
 
       - name: Wait for server to be ready
         run: |
